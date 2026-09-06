@@ -1,3 +1,7 @@
+---
+description: Sort images into aspect-ratio buckets.
+---
+
 # Organize Images by Aspect Ratio
 
 Sort images in the current folder (or a user-specified folder) into aspect-ratio buckets.

@@ -1,3 +1,7 @@
+---
+description: Sort images into sub-folders by resolution.
+---
+
 # Organize Images by Resolution
 
 Sort images in the current folder (or a user-specified folder) into resolution-based sub-folders.

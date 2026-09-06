@@ -1,3 +1,7 @@
+---
+description: Sort images into portrait, landscape, and square buckets.
+---
+
 # Organize Images by Orientation
 
 Sort images into `portrait/`, `landscape/`, and `square/` buckets.

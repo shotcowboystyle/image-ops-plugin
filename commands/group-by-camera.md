@@ -1,3 +1,7 @@
+---
+description: Cluster images into folders by EXIF camera make and model.
+---
+
 # Group Images by Camera
 
 Cluster images by EXIF camera Make + Model.

@@ -1,0 +1,773 @@
+{
+  "plugin": {
+    "name": "image-ops",
+    "displayName": "Image Ops",
+    "description": "Claude Code plugin for image editing, batch operations, format conversion, and filesystem organization of image libraries — bucket by resolution, aspect ratio, orientation, format, EXIF capture time, camera, and dedupe duplicates / near-duplicates.",
+    "version": "1.1.0",
+    "author": {
+      "name": "Curtis Blanton",
+      "email": "public@shotcowboystyle.com",
+      "url": "https://shotcowboystyle.com"
+    },
+    "license": "MIT",
+    "repository": "https://github.com/shotcowboystyle/image-ops-plugin",
+    "category": "Media Ops",
+    "tags": [
+      "image",
+      "media",
+      "exif",
+      "organization"
+    ],
+    "keywords": [
+      "media-editing",
+      "image-editing",
+      "image-ops",
+      "filesystem-organization",
+      "exif"
+    ]
+  },
+  "skills": [
+    {
+      "name": "auto-deskew",
+      "summary": "Use when the user wants to automatically straighten a tilted image — scanned documents, phone-captured pages, photographed receipts, or slightly off-axis photos. Detects the dominant skew angle and rotates the image to vertical/horizontal, optionally cropping the resulting transparent triangles. Uses ImageMagick `-deskew` for documents and a Hough-line fallback (via Python + OpenCV) for photographs.",
+      "tools": [
+        "Bash(magick *)",
+        "Bash(convert *)",
+        "Bash(identify *)",
+        "Bash(command *)",
+        "Bash(test *)",
+        "Bash(getconf *)",
+        "Bash(mktemp *)",
+        "Bash(cat *)",
+        "Bash(awk *)",
+        "Bash(rm *)",
+        "Bash(mkdir *)",
+        "Bash(find *)",
+        "Bash(xargs *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "straighten this scan",
+        "this photo is tilted",
+        "deskew before OCR"
+      ]
+    },
+    {
+      "name": "auto-tone",
+      "summary": "Use when the user wants automatic tonal correction — fix flat/washed-out / underexposed / low-contrast images by stretching levels, normalising contrast, and gamma-correcting to a neutral midtone. Implements auto-level (per-channel histogram stretch), auto-gamma (midtone correction), and a combined \"punch\" mode via ImageMagick. Operates on JPEG/PNG/TIFF/WebP.",
+      "tools": [
+        "Bash(magick *)",
+        "Bash(convert *)",
+        "Bash(identify *)",
+        "Bash(command *)",
+        "Bash(test *)",
+        "Bash(getconf *)",
+        "Bash(mktemp *)",
+        "Bash(awk *)",
+        "Bash(mv *)",
+        "Bash(rm *)",
+        "Bash(mkdir *)",
+        "Bash(find *)",
+        "Bash(xargs *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "this photo looks flat",
+        "fix the exposure on these",
+        "brighten up my scans"
+      ]
+    },
+    {
+      "name": "auto-white-balance",
+      "summary": "Use when the user wants to automatically correct the white balance of an image (or batch) — neutralise colour casts from indoor lighting, mixed light, underwater shots, scans, or uncalibrated cameras. Implements gray-world (default), white-patch (per-channel auto-level), and a combined mode via ImageMagick. Operates on JPEG/PNG/TIFF/WebP; for RAW use `darktable-cli` instead.",
+      "tools": [
+        "Bash(magick *)",
+        "Bash(convert *)",
+        "Bash(identify *)",
+        "Bash(command *)",
+        "Bash(test *)",
+        "Bash(getconf *)",
+        "Bash(mktemp *)",
+        "Bash(awk *)",
+        "Bash(mv *)",
+        "Bash(rm *)",
+        "Bash(mkdir *)",
+        "Bash(find *)",
+        "Bash(xargs *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "this photo looks too orange",
+        "fix the colour cast on these scans",
+        "white balance this batch"
+      ]
+    },
+    {
+      "name": "batch-set-copyright",
+      "summary": "Use when the user wants to batch-stamp copyright, artist, and rights information across every image in a directory — a photo library heading for distribution or archival. Convenience wrapper around exiftool. For arbitrary tags (description, keywords, GPS) on individual files, use `set-metadata` instead.",
+      "tools": [
+        "Bash(exiftool *)",
+        "Bash(command *)",
+        "Bash(find *)",
+        "Bash(date *)",
+        "Bash(wc *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "add my copyright to all these photos",
+        "stamp the artist name across this shoot"
+      ]
+    },
+    {
+      "name": "convert-to-avif",
+      "summary": "Use when the user wants AVIF output — modern web format with ~30% better compression than WebP at the same visual quality, and ~50% better than JPEG. Wraps `avifenc`. Companion to the `/convert-to-webp` command. Best target for new web work; check browser support if delivering to ancient clients.",
+      "tools": [
+        "Bash(avifenc *)",
+        "Bash(command *)",
+        "Bash(which *)",
+        "Bash(exiftool *)",
+        "Bash(find *)",
+        "Bash(xargs *)",
+        "Bash(sh *)",
+        "Bash(getconf *)",
+        "Bash(basename *)",
+        "Bash(mkdir *)",
+        "Bash(rm *)",
+        "Bash(wc *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "convert these to AVIF",
+        "encode this folder as AVIF for the web"
+      ]
+    },
+    {
+      "name": "fast-resize",
+      "summary": "Use when the user wants to resize a large batch of images (>500 files) where ImageMagick throughput is the bottleneck. Wraps libvips for 5–10× faster batch resize at lower memory. Falls back to ImageMagick if `vips` isn't installed. Same outputs as the `/batch-resize` command — different engine.",
+      "tools": [
+        "Bash(which *)",
+        "Bash(command *)",
+        "Bash(getconf *)",
+        "Bash(mktemp *)",
+        "Bash(awk *)",
+        "Bash(vips *)",
+        "Bash(vipsthumbnail *)",
+        "Bash(vipsheader *)",
+        "Bash(magick *)",
+        "Bash(convert *)",
+        "Bash(identify *)",
+        "Bash(mv *)",
+        "Bash(rm *)",
+        "Bash(mkdir *)",
+        "Bash(find *)",
+        "Bash(xargs *)",
+        "Bash(wc *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "resize this whole folder fast",
+        "these thousands of images are too slow in ImageMagick"
+      ]
+    },
+    {
+      "name": "fast-thumbnail",
+      "summary": "Use when the user wants to generate thumbnails at scale — index views, contact sheets, web previews, or just shrinking a library to manageable sizes. Wraps `vipsthumbnail` for sub-second-per-image generation, much faster than ImageMagick on large batches.",
+      "tools": [
+        "Bash(vipsthumbnail *)",
+        "Bash(command *)",
+        "Bash(which *)",
+        "Bash(find *)",
+        "Bash(xargs *)",
+        "Bash(sh *)",
+        "Bash(getconf *)",
+        "Bash(basename *)",
+        "Bash(mkdir *)",
+        "Bash(rm *)",
+        "Bash(wc *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "make thumbnails of this folder",
+        "build me a contact sheet's worth of previews",
+        "shrink these for a gallery index"
+      ]
+    },
+    {
+      "name": "from-jxl",
+      "summary": "Use when the user wants to decode JPEG XL images (.jxl) back to PNG or JPEG — for compatibility with tools that cannot read JXL, for display, or for further editing. Also recovers the byte-exact original JPEG from a lossless transcode. Reverse of `to-jxl`.",
+      "tools": [
+        "Bash(djxl *)",
+        "Bash(command *)",
+        "Bash(find *)",
+        "Bash(sh *)",
+        "Bash(magick *)",
+        "Bash(mkdir *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "convert these JXL files to PNG",
+        "my viewer can't open .jxl",
+        "get the original JPEG back out"
+      ]
+    },
+    {
+      "name": "images-to-pdf",
+      "summary": "Use when the user wants to combine a folder or list of images into a single PDF — typically on a standard paper size (A4 default) for digital printers, document-style sharing, or proof sheets. Modes - one-per-page (default; auto-orient portrait/landscape per image), multi-up (2/4/6/9 per page), as-is (native pixel size). Prefers `img2pdf` for lossless JPEG embedding; falls back to ImageMagick for non-JPEG sources or when img2pdf is missing.",
+      "tools": [
+        "Bash(img2pdf *)",
+        "Bash(magick *)",
+        "Bash(convert *)",
+        "Bash(montage *)",
+        "Bash(identify *)",
+        "Bash(pdfinfo *)",
+        "Bash(which *)",
+        "Bash(command *)",
+        "Bash(vipsthumbnail *)",
+        "Bash(find *)",
+        "Bash(mktemp *)",
+        "Bash(mkdir *)",
+        "Bash(rm *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "put these photos into a PDF",
+        "make a proof sheet",
+        "bundle this folder for the print shop"
+      ]
+    },
+    {
+      "name": "install-deps",
+      "summary": "Provision the plugin's tools — system binaries via the host package manager, Python tools into a plugin-owned uv venv at <data-dir>/venv/. Idempotent doctor — run before any command reports a missing dep. Never touches system Python or fights PEP 668.",
+      "tools": [
+        "Bash(which *)",
+        "Bash(command *)",
+        "Bash(uname *)",
+        "Bash(test *)",
+        "Bash(ls *)",
+        "Bash(apt *)",
+        "Bash(apt-get *)",
+        "Bash(brew *)",
+        "Bash(dnf *)",
+        "Bash(pacman *)",
+        "Bash(cargo *)",
+        "Bash(pipx *)",
+        "Bash(sudo *)",
+        "Bash(sh *)",
+        "Bash(uv *)",
+        "Bash(curl *)",
+        "Bash(python3 *)",
+        "Bash(magick *)",
+        "Bash(convert *)",
+        "Bash(identify *)",
+        "Bash(exiftool *)",
+        "Bash(fdupes *)",
+        "Bash(vips *)",
+        "Bash(vipsthumbnail *)",
+        "Bash(heif-convert *)",
+        "Bash(oxipng *)",
+        "Bash(pngquant *)",
+        "Bash(jpegoptim *)",
+        "Bash(cjpeg *)",
+        "Bash(avifenc *)",
+        "Bash(cjxl *)",
+        "Bash(djxl *)",
+        "Bash(img2pdf *)",
+        "Bash(upscayl-bin *)",
+        "Bash(realesrgan-ncnn-vulkan *)",
+        "Bash(darktable-cli *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": true
+    },
+    {
+      "name": "nano-tech-diagrams",
+      "summary": "Create and edit tech diagrams via a nano-tech-diagrams MCP server (Nano Banana 2 through Fal AI). Text-to-image, image-to-image, whiteboard cleanup, and 28+ style presets. Requires an externally configured MCP server — this plugin does not ship one.",
+      "tools": [
+        "Bash(curl *)",
+        "Bash(test *)",
+        "Bash(file *)",
+        "Bash(mkdir *)",
+        "Bash(rm *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false
+    },
+    {
+      "name": "new-project",
+      "summary": "Create a new image project inside the user's registered image workspace. Use when the user says \"new image project\", \"create an image project called X\", \"scaffold a new image set\", or similar. Creates a project subfolder with source, working, exports, references layout and an optional git init.",
+      "tools": [
+        "Bash(test *)",
+        "Bash(mkdir *)",
+        "Bash(ls *)",
+        "Bash(echo *)",
+        "Bash(git init:*)",
+        "Bash(date *)",
+        "Bash(jq *)",
+        "Bash(sed *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false
+    },
+    {
+      "name": "new-workflow",
+      "summary": "Scaffold a multi-touchpoint image workflow inside the registered image workspace — a structured pipeline with explicit human review gates and optional cloud-AI generation/edit steps (Fal nano-banana via MCP). Use when the user says \"new image workflow\", \"scaffold a workflow\", \"set up an image pipeline\", \"iterative image project\", or describes a job that needs multiple rounds of generation → review → revision → export.",
+      "tools": [
+        "Bash(test *)",
+        "Bash(mkdir *)",
+        "Bash(echo *)",
+        "Bash(seq *)",
+        "Bash(git init:*)",
+        "Bash(git rev-parse:*)",
+        "Bash(date *)",
+        "Bash(jq *)",
+        "Bash(sed *)",
+        "Bash(file *)",
+        "Bash(curl *)",
+        "Read",
+        "Write",
+        "Edit"
+      ],
+      "disableModelInvocation": false
+    },
+    {
+      "name": "open-workspace",
+      "summary": "Open the user's registered image workspace folder. Use when the user says \"open my image workspace\", \"take me to my image workspace\", or similar. Reads the path from workspace.json and opens a terminal (or Finder/file manager) there.",
+      "tools": [
+        "Bash(test *)",
+        "Bash(ls *)",
+        "Bash(echo *)",
+        "Bash(uname *)",
+        "Bash(jq *)",
+        "Bash(sed *)",
+        "Bash(open *)",
+        "Bash(konsole *)",
+        "Bash(gnome-terminal *)",
+        "Bash(xdg-open *)",
+        "Bash(command *)",
+        "Read"
+      ],
+      "disableModelInvocation": false
+    },
+    {
+      "name": "optimize-jpeg",
+      "summary": "Use when the user wants to shrink JPEG files — losslessly with `jpegoptim` (~5–15% reduction, no re-encode) or with re-compression via `mozjpeg` (~10–15% better than libjpeg-turbo at the same visual quality). Web-prep workhorse for photo libraries.",
+      "tools": [
+        "Bash(which *)",
+        "Bash(command *)",
+        "Bash(brew *)",
+        "Bash(test *)",
+        "Bash(getconf *)",
+        "Bash(mktemp *)",
+        "Bash(jpegoptim *)",
+        "Bash(djpeg *)",
+        "Bash(cjpeg *)",
+        "Bash(jpegtran *)",
+        "Bash(exiftool *)",
+        "Bash(identify *)",
+        "Bash(magick *)",
+        "Bash(mv *)",
+        "Bash(rm *)",
+        "Bash(find *)",
+        "Bash(xargs *)",
+        "Bash(wc *)",
+        "Bash(du *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "compress these JPEGs",
+        "make these photos smaller",
+        "optimise my JPEG folder for web"
+      ]
+    },
+    {
+      "name": "optimize-png",
+      "summary": "Use when the user wants to shrink PNG files in a batch — losslessly with `oxipng` (typical 20–40% reduction, byte-identical decode) or aggressively with `pngquant` (lossy palette quantisation, 60–80% reduction with near-imperceptible quality loss for web use). Web-prep workhorse.",
+      "tools": [
+        "Bash(oxipng *)",
+        "Bash(pngquant *)",
+        "Bash(which *)",
+        "Bash(command *)",
+        "Bash(find *)",
+        "Bash(mkdir *)",
+        "Bash(rm *)",
+        "Bash(wc *)",
+        "Bash(awk *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "these PNGs are huge",
+        "compress my screenshots",
+        "optimise this folder of UI assets"
+      ]
+    },
+    {
+      "name": "pdf-extract-embedded-images",
+      "summary": "Use when the user wants to recover the images embedded in a PDF at their native resolution, without rasterizing the pages — a PDF that is essentially a wrapper around photos. For rendering whole pages to images instead, use `pdf-to-images`.",
+      "tools": [
+        "Bash(pdfimages *)",
+        "Bash(command *)",
+        "Bash(file *)",
+        "Bash(ls *)",
+        "Bash(mkdir *)",
+        "Bash(wc *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "get the photos out of this PDF",
+        "extract the original images from this brochure",
+        "recover the embedded pictures at full quality"
+      ]
+    },
+    {
+      "name": "pdf-to-images",
+      "summary": "Use when the user wants to rasterize PDF pages into numbered image files (JPEG, PNG, or TIFF) at a chosen resolution (DPI) — one image per page, with optional page-range selection. For recovering the photos embedded in a PDF at native resolution instead, use `pdf-extract-embedded-images`.",
+      "tools": [
+        "Bash(pdftoppm *)",
+        "Bash(pdfinfo *)",
+        "Bash(command *)",
+        "Bash(file *)",
+        "Bash(ls *)",
+        "Bash(mkdir *)",
+        "Bash(wc *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "turn this PDF into images",
+        "export each page as a PNG",
+        "give me page 3 of this PDF as a JPEG"
+      ]
+    },
+    {
+      "name": "read-metadata",
+      "summary": "Use when the user wants to inspect EXIF, IPTC, XMP, or GPS metadata on images without modifying anything — read out as structured JSON or a human-readable summary. Read-only counterpart to `scrub-metadata` (removes) and `set-metadata` (writes).",
+      "tools": [
+        "Bash(exiftool *)",
+        "Bash(command *)",
+        "Bash(find *)",
+        "Bash(jq *)",
+        "Bash(head *)",
+        "Bash(wc *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "what camera took this photo",
+        "does this image have GPS in it",
+        "show me the EXIF for this folder"
+      ]
+    },
+    {
+      "name": "scrub-metadata",
+      "summary": "Strip EXIF / IPTC / XMP metadata from images using exiftool. Use when the user wants to remove identifying metadata (GPS, camera, timestamps, thumbnails) from a single image, a folder, or a recursive tree before sharing or publishing. Supports preview, backup-first, whitelist of fields to keep (e.g. Orientation), and recursive operation. Logs each run to notes/.",
+      "tools": [
+        "Bash(exiftool *)",
+        "Bash(command *)",
+        "Bash(mkdir *)",
+        "Bash(cp *)",
+        "Bash(test *)",
+        "Bash(dirname *)",
+        "Bash(mktemp *)",
+        "Bash(find *)",
+        "Bash(wc *)",
+        "Bash(date *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false
+    },
+    {
+      "name": "set-metadata",
+      "summary": "Use when the user wants to write arbitrary EXIF, IPTC, or XMP tags to images — artist, copyright, description, keywords, GPS coordinates, capture date, lens or camera model. For stamping only copyright/artist/rights uniformly across a whole directory, `batch-set-copyright` is the narrower wrapper.",
+      "tools": [
+        "Bash(exiftool *)",
+        "Bash(command *)",
+        "Bash(find *)",
+        "Bash(mkdir *)",
+        "Bash(cp *)",
+        "Bash(grep *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "set the description on this photo",
+        "add GPS coordinates to these images",
+        "fix the lens metadata"
+      ]
+    },
+    {
+      "name": "svg-to-raster",
+      "summary": "Use when the user wants to rasterize SVG files — convert SVG to PNG, PDF, or PostScript at a chosen resolution. Wraps CairoSVG (Python, in the plugin venv). Single file or batch. Companion to `vectorize` (other direction).",
+      "tools": [
+        "Bash(command *)",
+        "Bash(test *)",
+        "Bash(find *)",
+        "Bash(mkdir *)",
+        "Bash(rm *)",
+        "Bash(wc *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "convert this SVG to PNG",
+        "render my icons at 2x",
+        "I need a raster version of this logo"
+      ]
+    },
+    {
+      "name": "to-jxl",
+      "summary": "Use when the user wants to encode images of any raster format (PNG, GIF, WebP, TIFF, JPEG) to JPEG XL (.jxl) with a chosen quality preset — lossless, visually lossless, or web. General-purpose JXL encoder. For a JPEG-only archive where the goal is a byte-exact-recoverable lossless transcode with a savings report, use `transcode-jpeg-to-jxl-lossless` instead.",
+      "tools": [
+        "Bash(cjxl *)",
+        "Bash(command *)",
+        "Bash(find *)",
+        "Bash(sh *)",
+        "Bash(wc *)",
+        "Bash(du *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "convert these PNGs to JXL",
+        "encode this folder as JPEG XL",
+        "make JXL versions at web quality"
+      ]
+    },
+    {
+      "name": "transcode-jpeg-to-jxl-lossless",
+      "summary": "Use when the user wants to archive a JPEG-only library as JPEG XL — losslessly transcodes JPEG to .jxl, preserving the original bitstream for byte-exact recovery, with a dry-run preview and a byte-savings report (~15–25% reduction). Prefer this over the general-purpose `to-jxl` skill whenever the sources are exclusively JPEG and archival is the goal.",
+      "tools": [
+        "Bash(cjxl *)",
+        "Bash(djxl *)",
+        "Bash(command *)",
+        "Bash(find *)",
+        "Bash(sh *)",
+        "Bash(awk *)",
+        "Bash(wc *)",
+        "Bash(du *)",
+        "Bash(tail *)",
+        "Bash(tee *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "archive my JPEGs as JXL",
+        "shrink this photo library losslessly",
+        "JPEG to JXL without quality loss"
+      ]
+    },
+    {
+      "name": "upscale-image",
+      "summary": "Use when the user wants to AI-upscale images 2× / 3× / 4× — recovering detail in low-res sources, prepping small photos for print, enlarging AI-generated images. Wraps `upscayl-bin` (the CLI bundled with Upscayl) with its model library; falls back to standalone `realesrgan-ncnn-vulkan` if Upscayl isn't installed. GPU-accelerated via Vulkan.",
+      "tools": [
+        "Bash(which *)",
+        "Bash(command *)",
+        "Bash(test *)",
+        "Bash(upscayl-bin *)",
+        "Bash(realesrgan-ncnn-vulkan *)",
+        "Bash(vipsthumbnail *)",
+        "Bash(vipsheader *)",
+        "Bash(magick *)",
+        "Bash(identify *)",
+        "Bash(cjpeg *)",
+        "Bash(mv *)",
+        "Bash(rm *)",
+        "Bash(mkdir *)",
+        "Bash(find *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "upscale this image 4x",
+        "enlarge these photos for print",
+        "this image is too low-res, can you fix it"
+      ]
+    },
+    {
+      "name": "vectorize",
+      "summary": "Use when the user wants to trace a raster image (PNG/JPEG) into an SVG vector — useful for logos, line art, diagrams, and stylized illustrations. Wraps `vtracer` (Rust-backed, via Python wheel in the plugin venv). Companion to `svg-to-raster` (other direction).",
+      "tools": [
+        "Bash(command *)",
+        "Bash(test *)",
+        "Bash(find *)",
+        "Bash(grep *)",
+        "Bash(mkdir *)",
+        "Bash(rm *)",
+        "Bash(wc *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "vectorize this logo",
+        "convert this PNG to SVG",
+        "trace this line art"
+      ]
+    },
+    {
+      "name": "web-ready",
+      "summary": "Use when the user wants to take a folder of images (any mix of HEIC, RAW, PNG, JPEG, TIFF, WebP) and produce a web-ready set — EXIF stripped, resized to a sensible max dimension, encoded in modern formats (AVIF + WebP, with JPEG fallback), and optimized for size. End-to-end orchestrator over the single-purpose skills in this plugin.",
+      "tools": [
+        "Bash(which *)",
+        "Bash(command *)",
+        "Bash(test *)",
+        "Bash(brew *)",
+        "Bash(magick *)",
+        "Bash(convert *)",
+        "Bash(identify *)",
+        "Bash(exiftool *)",
+        "Bash(vips *)",
+        "Bash(vipsthumbnail *)",
+        "Bash(vipsheader *)",
+        "Bash(heif-convert *)",
+        "Bash(darktable-cli *)",
+        "Bash(avifenc *)",
+        "Bash(cwebp *)",
+        "Bash(cjpeg *)",
+        "Bash(jpegoptim *)",
+        "Bash(oxipng *)",
+        "Bash(mkdir *)",
+        "Bash(mv *)",
+        "Bash(rm *)",
+        "Bash(find *)",
+        "Bash(wc *)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "triggers": [
+        "make this folder web-ready",
+        "prep these photos for upload",
+        "get these images ready for my blog"
+      ]
+    },
+    {
+      "name": "workspace-setup",
+      "summary": "Register or create the user's image operations workspace — a folder on disk where they keep image projects. Use on first run, or when the user says \"set up my image workspace\", \"register my image workspace\", \"change my image workspace path\", or similar. Persists the path so other skills (open-workspace, new-project) can reference it.",
+      "tools": [
+        "Bash(mkdir *)",
+        "Bash(test *)",
+        "Bash(echo *)",
+        "Bash(realpath *)",
+        "Bash(date *)",
+        "Bash(git init:*)",
+        "Read",
+        "Write"
+      ],
+      "disableModelInvocation": false,
+      "command": {
+        "name": "setup-workspace",
+        "description": "Register or create the image production workspace folder.",
+        "body": "Register or create the image production workspace on disk."
+      }
+    }
+  ],
+  "commands": [
+    {
+      "name": "apply-filters",
+      "description": "Apply artistic or corrective filters to images with ImageMagick."
+    },
+    {
+      "name": "batch-resize",
+      "description": "Resize a whole folder of images to target dimensions or a scale factor."
+    },
+    {
+      "name": "bg-removal",
+      "description": "Remove the background from every image in a folder."
+    },
+    {
+      "name": "compress-images",
+      "description": "Reduce image file size while holding quality at an acceptable level."
+    },
+    {
+      "name": "convert-to-webp",
+      "description": "Convert every image in the current directory to WebP."
+    },
+    {
+      "name": "crop-images",
+      "description": "Crop images to fixed dimensions, an aspect ratio, or a custom area."
+    },
+    {
+      "name": "dedupe",
+      "description": "Find and remove duplicate and near-duplicate images."
+    },
+    {
+      "name": "group-by-camera",
+      "description": "Cluster images into folders by EXIF camera make and model."
+    },
+    {
+      "name": "group-by-time",
+      "description": "Cluster images into year and month folders by EXIF capture time."
+    },
+    {
+      "name": "images-here",
+      "description": "Flatten images out of nested sub-folders into the current directory."
+    },
+    {
+      "name": "install-gimp-plugin",
+      "description": "Install and register a GIMP plugin or extension."
+    },
+    {
+      "name": "organize-by-aspect-ratio",
+      "description": "Sort images into aspect-ratio buckets."
+    },
+    {
+      "name": "organize-by-format",
+      "description": "Sort images into sub-folders by file format."
+    },
+    {
+      "name": "organize-by-orientation",
+      "description": "Sort images into portrait, landscape, and square buckets."
+    },
+    {
+      "name": "organize-by-resolution",
+      "description": "Sort images into sub-folders by resolution."
+    },
+    {
+      "name": "scrub-small-images",
+      "description": "Move thumbnails, icons, and other sub-threshold images out of a library."
+    },
+    {
+      "name": "separate-photos-and-video",
+      "description": "Split a mixed folder into photos and videos sub-folders."
+    },
+    {
+      "name": "sort-media",
+      "description": "Sort a mixed media folder into type-based sub-folders."
+    }
+  ]
+}

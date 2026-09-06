@@ -1,3 +1,7 @@
+---
+description: Move thumbnails, icons, and other sub-threshold images out of a library.
+---
+
 # Scrub Small Images
 
 Identify and move images below a configurable size threshold — typically thumbnails, icons, favicons, chat-app previews, and web-sidebar gunk that clutters a library import.

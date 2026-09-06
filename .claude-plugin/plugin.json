@@ -1,7 +1,7 @@
 {
   "name": "image-ops",
   "description": "Claude Code plugin for image editing, batch operations, format conversion, and filesystem organization of image libraries — bucket by resolution, aspect ratio, orientation, format, EXIF capture time, camera, and dedupe duplicates / near-duplicates.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "Curtis Blanton",
     "email": "public@shotcowboystyle.com",
@@ -10,7 +10,6 @@
   "license": "MIT",
   "repository": "https://github.com/shotcowboystyle/image-ops-plugin",
   "commands": [
-    "./commands/setup-workspace.md",
     "./commands/apply-filters.md",
     "./commands/batch-resize.md",
     "./commands/bg-removal.md",
@@ -28,6 +27,7 @@
     "./commands/organize-by-resolution.md",
     "./commands/scrub-small-images.md",
     "./commands/separate-photos-and-video.md",
+    "./commands/setup-workspace.md",
     "./commands/sort-media.md"
   ],
   "skills": [

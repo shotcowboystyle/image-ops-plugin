@@ -1,3 +1,7 @@
+---
+description: Cluster images into year and month folders by EXIF capture time.
+---
+
 # Group Images by Capture Time
 
 Cluster images by EXIF `DateTimeOriginal` into year / month (and optionally day) folders.

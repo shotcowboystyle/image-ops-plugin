@@ -1,3 +1,7 @@
+---
+description: Find and remove duplicate and near-duplicate images.
+---
+
 # Deduplicate Images
 
 Find and remove duplicate or near-duplicate images.

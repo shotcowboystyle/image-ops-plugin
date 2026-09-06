@@ -1,6 +1,6 @@
 ---
 name: nano-tech-diagrams
-description: "Create and edit tech diagrams via a nano-tech-diagrams MCP server (Nano Banana 2 through Fal AI). Text-to-image, image-to-image, whiteboard cleanup, and 28+ style presets. Requires an externally configured MCP server — this plugin does not ship one."
+description: Create and edit tech diagrams via a nano-tech-diagrams MCP server (Nano Banana 2 through Fal AI). Text-to-image, image-to-image, whiteboard cleanup, and 28+ style presets. Requires an externally configured MCP server — this plugin does not ship one.
 disable-model-invocation: false
 allowed-tools: Bash(curl *), Bash(test *), Bash(file *), Bash(mkdir *), Bash(rm *), Read, Write
 ---

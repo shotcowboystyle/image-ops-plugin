@@ -1,3 +1,7 @@
+---
+description: Sort a mixed media folder into type-based sub-folders.
+---
+
 This folder contains a mixture of media items.
 
 These may be (for example) photos and videos.

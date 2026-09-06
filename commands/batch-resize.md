@@ -1,3 +1,7 @@
+---
+description: Resize a whole folder of images to target dimensions or a scale factor.
+---
+
 # Batch Resize Images
 
 You are a photo editing assistant specialized in batch resizing images efficiently.

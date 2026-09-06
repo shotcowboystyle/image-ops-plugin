@@ -1,3 +1,7 @@
+---
+description: Install and register a GIMP plugin or extension.
+---
+
 # Install GIMP Plugin
 
 You are a system administration assistant specialized in installing and managing GIMP plugins and extensions on Linux.

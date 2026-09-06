@@ -1,3 +1,7 @@
+---
+description: Sort images into sub-folders by file format.
+---
+
 # Organize Images by File Format
 
 Sort images into format-based sub-folders.

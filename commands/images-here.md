@@ -1,3 +1,7 @@
+---
+description: Flatten images out of nested sub-folders into the current directory.
+---
+
 This photo contains images in nested sub-folders.
 
 Please:
