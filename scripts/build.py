@@ -24,6 +24,8 @@ Run from the plugin root:
     python3 scripts/build.py --check    # exit 1 if anything on disk is stale
 """
 import json
+import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -60,15 +62,36 @@ def load():
         if name in seen:
             sys.exit(f"error: duplicate skill name: {name}")
         seen.add(name)
-        body = SKILL_SRC / f"{name}.md"
+        flat = SKILL_SRC / f"{name}.md"
+        packaged = SKILL_SRC / name / "SKILL.md"
+        if flat.is_file() and packaged.is_file():
+            sys.exit(
+                f"error: skill '{name}' exists both as {flat.relative_to(ROOT)} and "
+                f"{packaged.relative_to(ROOT)}. Keep one."
+            )
+        body = flat if flat.is_file() else packaged
         if not body.is_file():
-            sys.exit(f"error: manifest lists '{name}' but {body.relative_to(ROOT)} is missing")
+            sys.exit(
+                f"error: manifest lists '{name}' but neither "
+                f"{flat.relative_to(ROOT)} nor {packaged.relative_to(ROOT)} exists"
+            )
+        s["source"] = body
         for field in ("summary", "tools"):
             if not s.get(field):
                 sys.exit(f"error: skill '{name}' is missing required field '{field}'")
-        s["body"] = body.read_text(encoding="utf-8").strip()
+        raw = re.sub(r"^---\n.*?\n---\n", "", body.read_text(encoding="utf-8"), flags=re.S)
+        s["body"] = reanchor(
+            raw.strip(), body.parent, ROOT / "skills" / name, plugin.get("upstream")
+        )
+        s["resources"] = (
+            sorted(d for d in ("references", "scripts", "assets")
+                   if (body.parent / d).is_dir())
+            if body.name == "SKILL.md" else []
+        )
 
-    orphans = sorted(p.stem for p in SKILL_SRC.glob("*.md") if p.stem not in seen)
+    on_disk = {p.stem for p in SKILL_SRC.glob("*.md")}
+    on_disk |= {d.name for d in SKILL_SRC.glob("*/") if (d / "SKILL.md").is_file()}
+    orphans = sorted(on_disk - seen)
     if orphans:
         sys.exit("error: skill bodies with no manifest entry: " + ", ".join(orphans))
 
@@ -109,6 +132,42 @@ def load():
 # --------------------------------------------------------------------------
 # render
 # --------------------------------------------------------------------------
+
+LINK_RE = re.compile(r"(!?\[[^\]]*\]\()([^)\s]+)((?:\s+\"[^\"]*\")?\))")
+EXTERNAL_RE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//|#)", re.IGNORECASE)
+
+
+def reanchor(text, src_dir, dst_dir, upstream):
+    """Rewrite relative markdown links so they still resolve from `dst_dir`.
+
+    A skill body is authored next to the files it references. The generated copy
+    sits at a different depth, so every relative link has to be re-expressed.
+    A target that resolves outside this repository cannot be re-expressed at all
+    — it becomes an absolute upstream URL, the same contract the archive
+    packager used.
+    """
+    def fix(m):
+        head, target, tail = m.groups()
+        if EXTERNAL_RE.match(target):
+            return m.group(0)
+        path, _, frag = target.partition("#")
+        if not path:
+            return m.group(0)
+        resolved = (src_dir / path).resolve()
+        suffix = f"#{frag}" if frag else ""
+        try:
+            rel = resolved.relative_to(ROOT)
+        except ValueError:
+            return f"{head}{target}{tail}"
+        if not resolved.exists():
+            if upstream:
+                return f"{head}{upstream.rstrip('/')}/{rel.as_posix()}{suffix}{tail}"
+            return m.group(0)
+        new = os.path.relpath(resolved, dst_dir).replace(os.sep, "/")
+        return f"{head}{new}{suffix}{tail}"
+
+    return LINK_RE.sub(fix, text)
+
 
 def yaml_scalar(text):
     """Render a string as a YAML value, quoting only when it has to be quoted.
@@ -361,6 +420,49 @@ def stale_paths(skills, commands):
     return stale
 
 
+def sync_resources(skills, check, upstream):
+    """Mirror each skill's bundled references/, scripts/, assets/ into skills/<name>/.
+
+    These are copied verbatim rather than generated: they are data the skill
+    ships with, not text derived from the manifest.
+    """
+    drift = []
+    for s in skills:
+        if not s.get("resources"):
+            continue
+        src_root = s["source"].parent
+        dst_root = ROOT / "skills" / s["name"]
+        for res in s["resources"]:
+            src, dst = src_root / res, dst_root / res
+            for f in sorted(src.rglob("*")):
+                if not f.is_file():
+                    continue
+                target = dst / f.relative_to(src)
+                if f.suffix == ".md":
+                    # Bundled markdown links into the knowledge base too, and it
+                    # moves by the same amount the SKILL.md does.
+                    content = reanchor(
+                        f.read_text(encoding="utf-8"),
+                        f.parent, target.parent, upstream,
+                    ).encode("utf-8")
+                else:
+                    content = f.read_bytes()
+                if target.is_file() and target.read_bytes() == content:
+                    continue
+                drift.append(str(target.relative_to(ROOT)))
+                if not check:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(content)
+                    shutil.copystat(f, target)
+            if dst.is_dir():
+                for f in sorted(dst.rglob("*")):
+                    if f.is_file() and not (src / f.relative_to(dst)).is_file():
+                        drift.append(str(f.relative_to(ROOT)) + " (stale)")
+                        if not check:
+                            f.unlink()
+    return drift
+
+
 def main():
     check = "--check" in sys.argv[1:]
     plugin, skills, commands = load()
@@ -376,6 +478,8 @@ def main():
         if not check:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8")
+
+    drift += sync_resources(skills, check, plugin.get("upstream"))
 
     for path in stale_paths(skills, commands):
         drift.append(str(path.relative_to(ROOT)) + " (stale)")
