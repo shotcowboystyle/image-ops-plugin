@@ -35,6 +35,38 @@ python3 scripts/build.py           # regenerate after editing .agent/
 python3 scripts/build.py --check   # fail if anything on disk is stale
 ```
 
+## Editing this plugin
+
+Edit `.agent/`, never the generated layer. Changes to `skills/`, `commands/`, `AGENTS.md`, `.claude-plugin/plugin.json` or the README component block are overwritten on the next build.
+
+| To change | Edit |
+|-----------|------|
+| Agent identity, constraints, conventions | `.agent/agent.md` |
+| Plugin name, description, version, keywords | `plugin` block of `.agent/manifest.json` |
+| A skill's description, allowed tools, triggers | its entry in `skills` in `.agent/manifest.json` |
+| A skill's instructions | `.agent/skills/<name>.md` |
+| A standalone command | `.agent/commands/<name>.md` plus its entry in `commands` |
+| A command that wraps a skill | the `command` block on that skill's manifest entry |
+
+Workflow:
+
+1. Edit the source under `.agent/`. Metadata comes from the manifest only; any frontmatter in a body is stripped by the build. Write relative links from the source file's own location, and the build re-anchors them for the generated copy.
+2. To **add** a component, add its manifest entry and its body in the same change. The build refuses a body with no entry, and an entry with no body.
+3. To **remove** a component, delete both. The next build deletes the generated copy.
+4. Regenerate with `python3 scripts/build.py`.
+5. Review `git status` before committing. The build **deletes** any generated skill, command or agent that has no manifest entry, so an unexpected deletion means a missing entry.
+6. Run the gates, then commit the source and the generated files together:
+
+```bash
+python3 scripts/build.py --check
+claude plugin validate .
+```
+
+Manifest fields:
+
+- `skills[]`: `name`, `summary` (becomes the description), `tools` (allowed-tools), `disableModelInvocation`, optional `triggers`, `requires`, `command` (`name`, `description`, `argumentHint`, `body`).
+- `commands[]`: `name`, `description`, optional `argumentHint`, `tools`.
+- `plugin.version`: bump it for any change users should pick up.
 
 <!-- BEGIN GENERATED: components -->
 

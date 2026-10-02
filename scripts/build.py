@@ -7,6 +7,7 @@ derived from it and must never be edited directly:
     AGENTS.md                     agent definition, skill bodies, command bodies
     skills/<name>/SKILL.md        YAML frontmatter + verbatim body
     commands/<name>.md            frontmatter + body
+    agents/<name>.md              subagent frontmatter + body
     .claude-plugin/plugin.json    plugin meta + explicit component arrays
     README.md                     the block between the generated markers
 
@@ -17,6 +18,10 @@ A command comes from one of two places:
     - a standalone entry in the manifest's `commands` array, whose body lives at
       `.agent/commands/<name>.md`. Use this when the command carries its own
       prompt rather than delegating to a skill.
+
+An agent is a manifest `agents` entry whose body lives at
+`.agent/agents/<name>.md`. Agents are optional; a plugin without them generates
+exactly what it did before.
 
 Run from the plugin root:
 
@@ -36,6 +41,7 @@ MANIFEST = AGENT_DIR / "manifest.json"
 AGENT_MD = AGENT_DIR / "agent.md"
 SKILL_SRC = AGENT_DIR / "skills"
 COMMAND_SRC = AGENT_DIR / "commands"
+AGENT_SRC = AGENT_DIR / "agents"
 
 BEGIN = "<!-- BEGIN GENERATED: components -->"
 END = "<!-- END GENERATED: components -->"
@@ -55,6 +61,7 @@ def load():
     plugin = data["plugin"]
     skills = data.get("skills", [])
     commands = data.get("commands", [])
+    agents = data.get("agents", [])
 
     seen = set()
     for s in skills:
@@ -126,7 +133,28 @@ def load():
                 )
             cmd_seen.add(name)
 
-    return plugin, skills, commands
+    agent_seen = set()
+    for a in agents:
+        name = a["name"]
+        if name in agent_seen:
+            sys.exit(f"error: duplicate agent name: {name}")
+        agent_seen.add(name)
+        if not a.get("description"):
+            sys.exit(f"error: agent '{name}' is missing required field 'description'")
+        body = AGENT_SRC / f"{name}.md"
+        if not body.is_file():
+            sys.exit(
+                f"error: manifest lists agent '{name}' but "
+                f"{body.relative_to(ROOT)} is missing"
+            )
+        a["body"] = body.read_text(encoding="utf-8").strip()
+
+    if AGENT_SRC.is_dir():
+        stray = sorted(p.stem for p in AGENT_SRC.glob("*.md") if p.stem not in agent_seen)
+        if stray:
+            sys.exit("error: agent bodies with no manifest entry: " + ", ".join(stray))
+
+    return plugin, skills, commands, agents
 
 
 # --------------------------------------------------------------------------
@@ -159,6 +187,10 @@ def reanchor(text, src_dir, dst_dir, upstream):
             rel = resolved.relative_to(ROOT)
         except ValueError:
             return f"{head}{target}{tail}"
+        if resolved.is_relative_to(SKILL_SRC):
+            # A packaged skill links to its own (or a sibling's) files. Point at
+            # the generated copy under skills/, not back into .agent/.
+            resolved = ROOT / "skills" / resolved.relative_to(SKILL_SRC)
         if not resolved.exists():
             if upstream:
                 return f"{head}{upstream.rstrip('/')}/{rel.as_posix()}{suffix}{tail}"
@@ -283,6 +315,19 @@ def standalone_command_md(cmd):
     return "\n".join(command_frontmatter(cmd) + ["", cmd["body"], ""])
 
 
+def agent_file_md(agent):
+    lines = [
+        "---",
+        f"name: {agent['name']}",
+        f"description: {yaml_scalar(agent['description'])}",
+    ]
+    if agent.get("tools"):
+        lines.append(f"tools: {', '.join(agent['tools'])}")
+    if agent.get("model"):
+        lines.append(f"model: {agent['model']}")
+    return "\n".join(lines + ["---", "", agent["body"], ""])
+
+
 def command_index(skills, commands):
     """Every command as (name, description, argumentHint), in a stable order."""
     out = [
@@ -293,7 +338,7 @@ def command_index(skills, commands):
     return sorted(out, key=lambda c: c[0])
 
 
-def plugin_json(plugin, skills, commands):
+def plugin_json(plugin, skills, commands, agents):
     out = {
         "name": plugin["name"],
         "description": plugin["description"],
@@ -305,10 +350,12 @@ def plugin_json(plugin, skills, commands):
         "skills": [f"./skills/{s['name']}/" for s in skills],
         "keywords": plugin["keywords"],
     }
+    if agents:
+        out["agents"] = [f"./agents/{a['name']}.md" for a in agents]
     return json.dumps(out, indent=2, ensure_ascii=False) + "\n"
 
 
-def agents_md(plugin, skills, commands):
+def agents_md(plugin, skills, commands, agents):
     parts = [
         BANNER,
         "",
@@ -358,10 +405,29 @@ def agents_md(plugin, skills, commands):
                 parts += [f"**Arguments.** `{c['argumentHint']}`", ""]
             parts += [demote(body, 2), "", "---", ""]
 
+    if agents:
+        parts += [
+            "## Agents",
+            "",
+            "Role-scoped subagents. A runtime without subagents can adopt one by",
+            "following its body as a system prompt for that part of the work.",
+            "",
+        ]
+        for a in agents:
+            parts += [
+                f"### {a['name']}",
+                "",
+                f"**When to use.** {a['description'].rstrip()}",
+                "",
+            ]
+            if a.get("tools"):
+                parts += [f"**Tools.** {', '.join(a['tools'])}", ""]
+            parts += [demote(a["body"], 2), "", "---", ""]
+
     return "\n".join(parts).rstrip() + "\n"
 
 
-def readme_block(plugin, skills, commands):
+def readme_block(plugin, skills, commands, agents):
     lines = [BEGIN, "", "## Commands", ""]
     for name, desc, hint in command_index(skills, commands):
         suffix = f" {hint}" if hint else ""
@@ -369,15 +435,19 @@ def readme_block(plugin, skills, commands):
     lines += ["", "## Skills", ""]
     for s in skills:
         lines.append(f"- **{s['name']}** — {s['summary'].rstrip()}")
+    if agents:
+        lines += ["", "## Agents", ""]
+        for a in agents:
+            lines.append(f"- **{a['name']}** — {a['description'].rstrip()}")
     lines += ["", END]
     return "\n".join(lines)
 
 
-def render(plugin, skills, commands):
+def render(plugin, skills, commands, agents):
     """Return {relative path: content} for every generated file."""
     files = {
-        "AGENTS.md": agents_md(plugin, skills, commands),
-        ".claude-plugin/plugin.json": plugin_json(plugin, skills, commands),
+        "AGENTS.md": agents_md(plugin, skills, commands, agents),
+        ".claude-plugin/plugin.json": plugin_json(plugin, skills, commands, agents),
     }
     for s in skills:
         files[f"skills/{s['name']}/SKILL.md"] = skill_md(s)
@@ -385,6 +455,8 @@ def render(plugin, skills, commands):
             files[f"commands/{s['command']['name']}.md"] = skill_command_md(s)
     for c in commands:
         files[f"commands/{c['name']}.md"] = standalone_command_md(c)
+    for a in agents:
+        files[f"agents/{a['name']}.md"] = agent_file_md(a)
 
     readme = ROOT / "README.md"
     if readme.is_file():
@@ -392,7 +464,7 @@ def render(plugin, skills, commands):
         if BEGIN in text and END in text:
             head, rest = text.split(BEGIN, 1)
             _, tail = rest.split(END, 1)
-            files["README.md"] = head + readme_block(plugin, skills, commands) + tail
+            files["README.md"] = head + readme_block(plugin, skills, commands, agents) + tail
         else:
             sys.exit(
                 f"error: README.md is missing the generated markers.\n"
@@ -406,16 +478,20 @@ def render(plugin, skills, commands):
 # write / check
 # --------------------------------------------------------------------------
 
-def stale_paths(skills, commands):
-    """Generated skill and command files that no longer have a manifest entry."""
+def stale_paths(skills, commands, agents):
+    """Generated skill, command and agent files that no longer have a manifest entry."""
     keep_skills = {s["name"] for s in skills}
     keep_cmds = {c[0] for c in command_index(skills, commands)}
+    keep_agents = {a["name"] for a in agents}
     stale = []
     for d in sorted((ROOT / "skills").glob("*")):
         if d.is_dir() and d.name not in keep_skills:
             stale.append(d)
     for f in sorted((ROOT / "commands").glob("*.md")):
         if f.stem not in keep_cmds:
+            stale.append(f)
+    for f in sorted((ROOT / "agents").glob("*.md")):
+        if f.stem not in keep_agents:
             stale.append(f)
     return stale
 
@@ -465,8 +541,8 @@ def sync_resources(skills, check, upstream):
 
 def main():
     check = "--check" in sys.argv[1:]
-    plugin, skills, commands = load()
-    files = render(plugin, skills, commands)
+    plugin, skills, commands, agents = load()
+    files = render(plugin, skills, commands, agents)
 
     drift = []
     for rel, content in sorted(files.items()):
@@ -481,7 +557,7 @@ def main():
 
     drift += sync_resources(skills, check, plugin.get("upstream"))
 
-    for path in stale_paths(skills, commands):
+    for path in stale_paths(skills, commands, agents):
         drift.append(str(path.relative_to(ROOT)) + " (stale)")
         if not check:
             shutil.rmtree(path) if path.is_dir() else path.unlink()
